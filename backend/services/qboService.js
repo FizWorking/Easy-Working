@@ -75,6 +75,12 @@ class QboService {
   }
 
   normalizeError(err) {
+    console.log('[QBO ERROR]', JSON.stringify({
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      data: err.response?.data,
+      headers: err.response?.headers
+    }, null, 2));
     if (err.response?.data?.Fault?.Error) {
       const msgs = err.response.data.Fault.Error.map(e => {
         const detail = e.Detail ? ' [' + e.Detail + ']' : '';

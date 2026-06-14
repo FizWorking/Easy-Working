@@ -226,13 +226,12 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
       const partial = Object.keys(taxCodeMap).find(k => k.toLowerCase().includes(tcn.toLowerCase()));
       if (partial) taxCodeId = taxCodeMap[partial];
     }
-    if (taxCodeId && lineItem.DetailType === 'AccountBasedExpenseLineDetail') {
-      lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
-    }
+    // TaxCodeRef on line item removed — only header-level TxnTaxDetail used
   }
   if (tcn && !taxCodeId) console.log(`[TAX DEBUG] TaxCode "${tcn}" not found in taxCodeMap keys:`, Object.keys(taxCodeMap));
 
   // Tax Amount & TxnTaxDetail
+  // Try: header-level TxnTaxDetail only (no TaxCodeRef on line item)
   const taxAmtStr = val('taxAmount') || defaults.taxAmount;
   const taxAmount = parseFloat(taxAmtStr);
   if (!isNaN(taxAmount) && taxAmount > 0 && taxCodeId) {
@@ -242,22 +241,13 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
 
     lineItem.Amount = isInclusive ? netAmount : lineAmount;
 
-    const taxRateName = defaults.taxRateName || '';
-    let taxRateId = taxRateMap[taxRateName.toLowerCase()] || taxRateMap[taxRateName];
-    if (!taxRateId && taxRates.length > 0) {
-      const firstRate = taxRates.find(r => r.Id);
-      if (firstRate) taxRateId = firstRate.Id;
-    }
-
     const taxLine = {
       Amount: taxAmount,
       DetailType: 'TaxLineDetail',
       TaxLineDetail: {
-        NetAmount: netAmount,
-        PercentBased: false
+        NetAmount: netAmount
       }
     };
-    if (taxRateId) taxLine.TaxLineDetail.TaxRateRef = { value: taxRateId };
 
     data.TxnTaxDetail = {
       TxnTaxCodeRef: { value: taxCodeId },
