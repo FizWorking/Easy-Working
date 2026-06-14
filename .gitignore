@@ -1,0 +1,9 @@
+backend/.env
+backend/node_modules/
+backend/data/
+node_modules/
+.DS_Store
+*.log
+intuit development1.jpg
+intuit development2.jpg
+~$*.xlsx
