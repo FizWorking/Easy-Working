@@ -241,19 +241,35 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   }
   if (tcn && !taxCodeId) console.log(`[TAX DEBUG] TaxCode "${tcn}" not found in taxCodeMap keys:`, Object.keys(taxCodeMap));
 
-  // Manual TxnTaxDetail with exact TotalTax (QBO doesn't calculate, we tell it the amount)
+  // Manual TxnTaxDetail with TaxLine + TaxRateRef
   const taxAmtStr = val('taxAmount') || defaults.taxAmount;
   const taxAmount = parseFloat(taxAmtStr);
   if (!isNaN(taxAmount) && taxAmount > 0 && taxCodeId) {
+    const taxCodeName = (taxCodes.find(t => t.Id === taxCodeId)?.Name || tcn).toLowerCase();
+    const matchedRates = taxRates.filter(r =>
+      r.Name?.toLowerCase().includes(taxCodeName) && r.RateValue > 0
+    ).sort((a, b) => {
+      const aP = a.Name?.toLowerCase().includes('purchases') ? 1 : 0;
+      const bP = b.Name?.toLowerCase().includes('purchases') ? 1 : 0;
+      return bP - aP;
+    });
+    const taxRateId = matchedRates.length > 0 ? matchedRates[0].Id : null;
+    if (taxRateId) console.log(`[TAX DEBUG] Matched TaxRate: ${matchedRates[0].Name} (ID: ${taxRateId})`);
+
+    const taxLine = {
+      Amount: taxAmount,
+      DetailType: 'TaxLineDetail',
+      TaxLineDetail: {}
+    };
+    if (taxRateId) taxLine.TaxLineDetail.TaxRateRef = { value: taxRateId };
+
     data.TxnTaxDetail = {
       TxnTaxCodeRef: { value: taxCodeId },
-      TotalTax: taxAmount
+      TotalTax: taxAmount,
+      TaxLine: [taxLine]
     };
-    console.log(`[TAX DEBUG] Adding TxnTaxDetail: TotalTax=${taxAmount}, TxnTaxCodeRef=${taxCodeId}`);
+    console.log(`[TAX DEBUG] Adding TxnTaxDetail: TotalTax=${taxAmount}, TxnTaxCodeRef=${taxCodeId}, TaxRateRef=${taxRateId}`);
   }
-
-  // If taxAmount column is mapped, use it for documentation only (QBO calculates it)
-  // If inclusive, QBO handles based on TaxCode config
 
   return data;
 }
