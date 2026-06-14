@@ -209,13 +209,22 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   // Class (only if useClass is enabled and classes exist in QBO)
   if (defaults.useClass !== 'false' && Object.keys(classMap).length > 0) {
     const cn = val('class');
-    console.log(`[CLASS DEBUG] Class val="${cn}", defaults.className="${defaults.className}", classMap keys=${Object.keys(classMap).filter(k => isNaN(k)).join(',')}`);
+    const availableClasses = Object.keys(classMap).filter(k => isNaN(k));
+    console.log(`[CLASS DEBUG] Class val="${cn}", defaults.className="${defaults.className}", available classes=${availableClasses.join(', ')}`);
     if (cn) {
       const cid = classMap[cn.toLowerCase()] || classMap[cn];
-      if (cid) data.ClassRef = { value: cid };
+      if (cid) {
+        data.ClassRef = { value: cid };
+      } else {
+        console.log(`[CLASS WARNING] Class "${cn}" not found in QBO. Available: ${availableClasses.join(', ')}`);
+      }
     } else if (defaults.className) {
       const cid = classMap[defaults.className.toLowerCase()] || classMap[defaults.className];
-      if (cid) data.ClassRef = { value: cid };
+      if (cid) {
+        data.ClassRef = { value: cid };
+      } else {
+        console.log(`[CLASS WARNING] Default class "${defaults.className}" not found in QBO.`);
+      }
     }
   }
 

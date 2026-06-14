@@ -146,7 +146,7 @@ const ImportPage = {
       'date': ['date', 'txn date', 'transaction date', 'trans date', 'posting date'],
       'vendor': ['vendor', 'vendor name', 'payee', 'supplier', 'name', 'supplier name'],
       'amount': ['amount', 'total', 'sum', 'value', 'transaction amount', 'amt'],
-      'account': ['account', 'expense account', 'category', 'account name', 'expense category', 'class', 'type'],
+      'account': ['account', 'expense account', 'category', 'account name', 'expense category', 'type'],
       'description': ['description', 'memo', 'note', 'notes', 'details', 'narration', 'particulars'],
       'docNumber': ['check', 'check no', 'check number', 'reference', 'ref no', 'doc number', 'reference number'],
       'dueDate': ['due date', 'due', 'pay by'],
