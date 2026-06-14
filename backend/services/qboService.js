@@ -102,8 +102,16 @@ class QboService {
   }
 
   async getClasses() {
-    const data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20Class%20where%20Active%20%3D%20true&minorversion=73`);
-    return data.QueryResponse?.Class || [];
+    let data;
+    try {
+      data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20Class&minorversion=73`);
+    } catch (e) {
+      console.log('[QBO CLASS ERROR]', e.message);
+      return [];
+    }
+    const result = data.QueryResponse?.Class || [];
+    console.log('[QBO CLASS DEBUG] getClasses raw:', JSON.stringify(result.map(c => ({ Id: c.Id, Name: c.Name, Active: c.Active }))));
+    return result;
   }
 
   async getTaxCodes() {

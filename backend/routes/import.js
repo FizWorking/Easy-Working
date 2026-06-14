@@ -93,7 +93,8 @@ router.post('/execute', auth, async (req, res) => {
   let accounts = [], vendors = [], classes = [], taxCodes = [], taxRates = [];
   try { accounts = await qboSvc.getAccounts(); } catch (_) {}
   try { vendors = await qboSvc.getVendors(); } catch (_) {}
-  try { classes = await qboSvc.getClasses(); } catch (_) {}
+  try { classes = await qboSvc.getClasses(); } catch (e) { console.log('[CLASS DEBUG] getClasses error:', e.message); }
+  console.log('[CLASS DEBUG] Raw classes response:', JSON.stringify(classes));
   try { taxCodes = await qboSvc.getTaxCodes(); } catch (_) {}
   try { taxRates = await qboSvc.getTaxRates(); } catch (_) {}
 
