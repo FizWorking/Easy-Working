@@ -218,7 +218,7 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
     }
   }
 
-  // Tax Code on line item — QBO auto-calculates tax (like SaaSant)
+  // Tax Code lookup
   const tcn = val('taxCode') || defaults.taxCode;
   let taxCodeId = null;
   if (tcn && Object.keys(taxCodeMap).length > 0) {
@@ -240,7 +240,16 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   }
   if (tcn && !taxCodeId) console.log(`[TAX DEBUG] TaxCode "${tcn}" not found in taxCodeMap keys:`, Object.keys(taxCodeMap));
 
-  // QBO auto-calculates tax from TaxCodeRef and Amount — no manual TxnTaxDetail
+  // Manual TxnTaxDetail with exact TotalTax (QBO doesn't calculate, we tell it the amount)
+  const taxAmtStr = val('taxAmount') || defaults.taxAmount;
+  const taxAmount = parseFloat(taxAmtStr);
+  if (!isNaN(taxAmount) && taxAmount > 0 && taxCodeId) {
+    data.TxnTaxDetail = {
+      TxnTaxCodeRef: { value: taxCodeId },
+      TotalTax: taxAmount
+    };
+    console.log(`[TAX DEBUG] Adding TxnTaxDetail: TotalTax=${taxAmount}, TxnTaxCodeRef=${taxCodeId}`);
+  }
 
   // If taxAmount column is mapped, use it for documentation only (QBO calculates it)
   // If inclusive, QBO handles based on TaxCode config
