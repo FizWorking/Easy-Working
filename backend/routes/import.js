@@ -219,8 +219,23 @@ function fmtDate(s, format) {
   const str = s.toString().trim();
   if (!str) return null;
 
-  // Already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // Already YYYY-MM-DD and valid
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split('-').map(Number);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) return str;
+  }
+
+  // Excel serial date number (e.g. 45292 → 2024-01-01)
+  if (/^\d{5}$/.test(str)) {
+    const excelEpoch = new Date(1899, 11, 30);
+    const d = new Date(excelEpoch.getTime() + parseInt(str) * 86400000);
+    return d.toISOString().split('T')[0];
+  }
+
+  // Non-standard date like "+046301-01-01" (Excel serial misinterpreted)
+  if (/^[+-]\d{5,6}/.test(str)) {
+    return null;
+  }
 
   if (format === 'DD/MM/YYYY') {
     const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -253,23 +268,24 @@ function fmtDate(s, format) {
     if (m && months[m[2].toLowerCase()]) return `${m[3]}-${months[m[2].toLowerCase()]}-${m[1].padStart(2,'0')}`;
   }
 
-  // Auto-detect common formats
-  // MM/DD/YYYY or DD/MM/YYYY
-  const slash = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slash) {
-    const a = parseInt(slash[1]), b = parseInt(slash[2]), y = slash[3];
-    if (a > 12) return `${y}-${slash[2].padStart(2,'0')}-${slash[1].padStart(2,'0')}`; // DD/MM/YYYY
-    if (b > 12) return `${y}-${slash[1].padStart(2,'0')}-${slash[2].padStart(2,'0')}`; // MM/DD/YYYY
-    return `${y}-${slash[1].padStart(2,'0')}-${slash[2].padStart(2,'0')}`; // ambiguous -> treat as MM/DD
+  // Auto-detect slash & dash formats
+  const sep = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (sep) {
+    const a = parseInt(sep[1]), b = parseInt(sep[2]), y = sep[3];
+    if (a > 12) return `${y}-${sep[2].padStart(2,'0')}-${sep[1].padStart(2,'0')}`; // DD/MM/YYYY or DD-MM-YYYY
+    if (b > 12) return `${y}-${sep[1].padStart(2,'0')}-${sep[2].padStart(2,'0')}`; // MM/DD/YYYY or MM-DD-YYYY
+    return `${y}-${sep[1].padStart(2,'0')}-${sep[2].padStart(2,'0')}`; // ambiguous -> treat as MM/DD
   }
 
   // Try native Date parsing
   const d = new Date(str);
   if (!isNaN(d.getTime())) {
-    return d.toISOString().split('T')[0];
+    const iso = d.toISOString().split('T')[0];
+    const [y, m, day] = iso.split('-').map(Number);
+    if (m >= 1 && m <= 12 && day >= 1 && day <= 31) return iso;
   }
 
-  return str;
+  return null;
 }
 
 router.get('/history', auth, (req, res) => {
