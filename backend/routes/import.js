@@ -99,16 +99,16 @@ router.post('/execute', auth, async (req, res) => {
   try { taxRates = await qboSvc.getTaxRates(); } catch (_) {}
 
   const acctMap = {};
-  accounts.forEach(a => { acctMap[a.Name.toLowerCase()] = a.Id; acctMap[a.Id] = a.Id; });
+  accounts.forEach(a => { acctMap[a.Name.toLowerCase().trim()] = a.Id; acctMap[a.Id] = a.Id; });
   const vendMap = {};
-  vendors.forEach(v => { vendMap[v.DisplayName.toLowerCase()] = v.Id; vendMap[v.Id] = v.Id; });
+  vendors.forEach(v => { vendMap[v.DisplayName.toLowerCase().trim()] = v.Id; vendMap[v.Id] = v.Id; });
   const classMap = {};
-  classes.forEach(c => { classMap[c.Name.toLowerCase()] = c.Id; classMap[c.Id] = c.Id; });
+  classes.forEach(c => { classMap[c.Name.toLowerCase().trim()] = c.Id; classMap[c.Id] = c.Id; });
   const taxCodeMap = {};
-  taxCodes.forEach(t => { taxCodeMap[t.Name.toLowerCase()] = t.Id; taxCodeMap[t.Id] = t.Id; });
+  taxCodes.forEach(t => { taxCodeMap[t.Name.toLowerCase().trim()] = t.Id; taxCodeMap[t.Id] = t.Id; });
   console.log(`[TAX DEBUG] TaxCodes found: ${taxCodes.length}`, taxCodes.map(t => ({ Id: t.Id, Name: t.Name })));
   const taxRateMap = {};
-  taxRates.forEach(r => { taxRateMap[r.Name.toLowerCase()] = r.Id; taxRateMap[r.Id] = r.Id; taxRateMap[r.RateValue?.toString()] = r.Id; });
+  taxRates.forEach(r => { taxRateMap[r.Name.toLowerCase().trim()] = r.Id; taxRateMap[r.Id] = r.Id; taxRateMap[r.RateValue?.toString()] = r.Id; });
   console.log(`[TAX DEBUG] TaxRates found: ${taxRates.length}`, taxRates.map(r => ({ Id: r.Id, Name: r.Name, RateValue: r.RateValue })));
 
   let success = 0, errors = 0;
@@ -238,7 +238,7 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
       const partial = Object.keys(taxCodeMap)
         .filter(k => isNaN(k))
         .sort((a, b) => b.length - a.length)
-        .find(k => cleanTcn.includes(k.toLowerCase()));
+        .find(k => cleanTcn.includes(k.toLowerCase().trim()));
       if (partial) {
         taxCodeId = taxCodeMap[partial];
         console.log(`[TAX DEBUG] Partial match: "${tcn}" → "${partial}" (ID: ${taxCodeId})`);
