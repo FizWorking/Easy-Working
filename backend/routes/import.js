@@ -105,8 +105,10 @@ router.post('/execute', auth, async (req, res) => {
   classes.forEach(c => { classMap[c.Name.toLowerCase()] = c.Id; classMap[c.Id] = c.Id; });
   const taxCodeMap = {};
   taxCodes.forEach(t => { taxCodeMap[t.Name.toLowerCase()] = t.Id; taxCodeMap[t.Id] = t.Id; });
+  console.log(`[TAX DEBUG] TaxCodes found: ${taxCodes.length}`, taxCodes.map(t => ({ Id: t.Id, Name: t.Name })));
   const taxRateMap = {};
   taxRates.forEach(r => { taxRateMap[r.Name.toLowerCase()] = r.Id; taxRateMap[r.Id] = r.Id; taxRateMap[r.RateValue?.toString()] = r.Id; });
+  console.log(`[TAX DEBUG] TaxRates found: ${taxRates.length}`, taxRates.map(r => ({ Id: r.Id, Name: r.Name, RateValue: r.RateValue })));
 
   let success = 0, errors = 0;
 
@@ -116,7 +118,7 @@ router.post('/execute', auth, async (req, res) => {
 
     try {
       const qboData = buildQBOData(row, mapping, defaults, transactionType, acctMap, vendMap, classMap, taxCodeMap, taxRateMap, dateFormat, taxRates);
-      if (i < 2) console.log('Row ' + rowNum + ' JSON:', JSON.stringify(qboData, null, 2));
+      if (i < 2 || qboData.TxnTaxDetail) console.log('Row ' + rowNum + ' JSON:', JSON.stringify(qboData, null, 2));
       let result;
       if (transactionType === 'Expense') result = await qboSvc.createPurchase(qboData);
       else if (transactionType === 'Bill') result = await qboSvc.createBill(qboData);
@@ -220,10 +222,15 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   let taxCodeId = null;
   if (tcn && Object.keys(taxCodeMap).length > 0) {
     taxCodeId = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
+    if (!taxCodeId) {
+      const partial = Object.keys(taxCodeMap).find(k => k.toLowerCase().includes(tcn.toLowerCase()));
+      if (partial) taxCodeId = taxCodeMap[partial];
+    }
     if (taxCodeId && lineItem.DetailType === 'AccountBasedExpenseLineDetail') {
       lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
     }
   }
+  if (tcn && !taxCodeId) console.log(`[TAX DEBUG] TaxCode "${tcn}" not found in taxCodeMap keys:`, Object.keys(taxCodeMap));
 
   // Tax Amount & TxnTaxDetail
   const taxAmtStr = val('taxAmount') || defaults.taxAmount;
