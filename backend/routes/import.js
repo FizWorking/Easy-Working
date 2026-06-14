@@ -217,7 +217,7 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
     }
   }
 
-  // Tax Code on line item (from mapped column or default)
+  // Tax Code on line item — QBO auto-calculates tax (like SaaSant)
   const tcn = val('taxCode') || defaults.taxCode;
   let taxCodeId = null;
   if (tcn && Object.keys(taxCodeMap).length > 0) {
@@ -226,35 +226,16 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
       const partial = Object.keys(taxCodeMap).find(k => k.toLowerCase().includes(tcn.toLowerCase()));
       if (partial) taxCodeId = taxCodeMap[partial];
     }
-    // TaxCodeRef on line item removed — only header-level TxnTaxDetail used
+    if (taxCodeId) {
+      lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
+    }
   }
   if (tcn && !taxCodeId) console.log(`[TAX DEBUG] TaxCode "${tcn}" not found in taxCodeMap keys:`, Object.keys(taxCodeMap));
 
-  // Tax Amount & TxnTaxDetail
-  // Try: header-level TxnTaxDetail only (no TaxCodeRef on line item)
-  const taxAmtStr = val('taxAmount') || defaults.taxAmount;
-  const taxAmount = parseFloat(taxAmtStr);
-  if (!isNaN(taxAmount) && taxAmount > 0 && taxCodeId) {
-    const lineAmount = Math.abs(amount);
-    const isInclusive = defaults.taxInclusive === 'true';
-    const netAmount = isInclusive ? (lineAmount - taxAmount) : lineAmount;
+  // QBO auto-calculates tax from TaxCodeRef and Amount — no manual TxnTaxDetail
 
-    lineItem.Amount = isInclusive ? netAmount : lineAmount;
-
-    const taxLine = {
-      Amount: taxAmount,
-      DetailType: 'TaxLineDetail',
-      TaxLineDetail: {
-        NetAmount: netAmount
-      }
-    };
-
-    data.TxnTaxDetail = {
-      TxnTaxCodeRef: { value: taxCodeId },
-      TotalTax: taxAmount,
-      TaxLine: [taxLine]
-    };
-  }
+  // If taxAmount column is mapped, use it for documentation only (QBO calculates it)
+  // If inclusive, QBO handles based on TaxCode config
 
   return data;
 }
