@@ -100,6 +100,11 @@ class QboService {
     return data.QueryResponse?.Class || [];
   }
 
+  async getTaxCodes() {
+    const data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20TaxCode&minorversion=73`);
+    return data.QueryResponse?.TaxCode || [];
+  }
+
   async createPurchase(data) {
     return this.post(`${this.baseUrl}/purchase?minorversion=73`, data);
   }

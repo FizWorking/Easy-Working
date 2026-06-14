@@ -90,10 +90,11 @@ router.post('/execute', auth, async (req, res) => {
     store.update('qbo_connections', { id: connId }, { access_token: at, refresh_token: rt });
   });
 
-  let accounts = [], vendors = [], classes = [];
+  let accounts = [], vendors = [], classes = [], taxCodes = [];
   try { accounts = await qboSvc.getAccounts(); } catch (_) {}
   try { vendors = await qboSvc.getVendors(); } catch (_) {}
   try { classes = await qboSvc.getClasses(); } catch (_) {}
+  try { taxCodes = await qboSvc.getTaxCodes(); } catch (_) {}
 
   const acctMap = {};
   accounts.forEach(a => { acctMap[a.Name.toLowerCase()] = a.Id; acctMap[a.Id] = a.Id; });
@@ -101,6 +102,8 @@ router.post('/execute', auth, async (req, res) => {
   vendors.forEach(v => { vendMap[v.DisplayName.toLowerCase()] = v.Id; vendMap[v.Id] = v.Id; });
   const classMap = {};
   classes.forEach(c => { classMap[c.Name.toLowerCase()] = c.Id; classMap[c.Id] = c.Id; });
+  const taxCodeMap = {};
+  taxCodes.forEach(t => { taxCodeMap[t.Name.toLowerCase()] = t.Id; taxCodeMap[t.Id] = t.Id; });
 
   let success = 0, errors = 0;
 
@@ -109,7 +112,7 @@ router.post('/execute', auth, async (req, res) => {
     const rowNum = i + 2;
 
     try {
-      const qboData = buildQBOData(row, mapping, defaults, transactionType, acctMap, vendMap, classMap, dateFormat);
+      const qboData = buildQBOData(row, mapping, defaults, transactionType, acctMap, vendMap, classMap, taxCodeMap, dateFormat);
       if (i < 2) console.log('Row ' + rowNum + ' JSON:', JSON.stringify(qboData, null, 2));
       let result;
       if (transactionType === 'Expense') result = await qboSvc.createPurchase(qboData);
@@ -137,7 +140,7 @@ router.post('/execute', auth, async (req, res) => {
   res.json({ importId, status, total: cached.data.length, success, errors });
 });
 
-function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, dateFormat) {
+function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, taxCodeMap, dateFormat) {
   const val = (field) => {
     const col = mapping[field];
     return (col && row[col] !== undefined && row[col] !== '') ? row[col].toString().trim() : null;
@@ -197,17 +200,24 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   const memo = val('memo') || desc;
   if (memo) data.PrivateNote = memo;
 
-  // Class
-  const cn = val('class');
-  if (cn) {
-    const cid = classMap[cn.toLowerCase()] || classMap[cn];
-    if (cid) {
-      data.ClassRef = { value: cid };
+  // Class (only if useClass is enabled and classes exist in QBO)
+  if (defaults.useClass !== 'false' && Object.keys(classMap).length > 0) {
+    const cn = val('class');
+    if (cn) {
+      const cid = classMap[cn.toLowerCase()] || classMap[cn];
+      if (cid) data.ClassRef = { value: cid };
+    } else if (defaults.className) {
+      const cid = classMap[defaults.className.toLowerCase()] || classMap[defaults.className];
+      if (cid) data.ClassRef = { value: cid };
     }
-  } else if (defaults.className) {
-    const cid = classMap[defaults.className.toLowerCase()] || classMap[defaults.className];
-    if (cid) {
-      data.ClassRef = { value: cid };
+  }
+
+  // Tax Code on line item (from mapped column or default)
+  const tcn = val('taxCode') || defaults.taxCode;
+  if (tcn && Object.keys(taxCodeMap).length > 0) {
+    const tcid = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
+    if (tcid && lineItem.DetailType === 'AccountBasedExpenseLineDetail') {
+      lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: tcid };
     }
   }
 
