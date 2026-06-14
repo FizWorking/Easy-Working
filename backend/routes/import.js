@@ -208,6 +208,7 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   // Class (only if useClass is enabled and classes exist in QBO)
   if (defaults.useClass !== 'false' && Object.keys(classMap).length > 0) {
     const cn = val('class');
+    console.log(`[CLASS DEBUG] Class val="${cn}", defaults.className="${defaults.className}", classMap keys=${Object.keys(classMap).filter(k => isNaN(k)).join(',')}`);
     if (cn) {
       const cid = classMap[cn.toLowerCase()] || classMap[cn];
       if (cid) data.ClassRef = { value: cid };
@@ -223,8 +224,15 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   if (tcn && Object.keys(taxCodeMap).length > 0) {
     taxCodeId = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
     if (!taxCodeId) {
-      const partial = Object.keys(taxCodeMap).find(k => k.toLowerCase().includes(tcn.toLowerCase()));
-      if (partial) taxCodeId = taxCodeMap[partial];
+      const cleanTcn = tcn.toLowerCase().replace(/\(.*?\)/g, '').replace(/[%]/g, '').trim();
+      const partial = Object.keys(taxCodeMap)
+        .filter(k => isNaN(k))
+        .sort((a, b) => b.length - a.length)
+        .find(k => cleanTcn.includes(k.toLowerCase()));
+      if (partial) {
+        taxCodeId = taxCodeMap[partial];
+        console.log(`[TAX DEBUG] Partial match: "${tcn}" → "${partial}" (ID: ${taxCodeId})`);
+      }
     }
     if (taxCodeId) {
       lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
