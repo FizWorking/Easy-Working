@@ -151,7 +151,8 @@ const ImportPage = {
       'docNumber': ['check', 'check no', 'check number', 'reference', 'ref no', 'doc number', 'reference number'],
       'dueDate': ['due date', 'due', 'pay by'],
       'class': ['class', 'class name', 'tracking class'],
-      'taxCode': ['tax', 'tax code', 'tax category', 'gst', 'vat', 'sales tax', 'tax rate']
+      'taxCode': ['tax', 'tax code', 'tax category', 'gst', 'vat', 'sales tax', 'tax rate'],
+      'taxAmount': ['tax amount', 'tax amt', 'gst amount', 'vat amount', 'sales tax amount']
     };
 
     cols.forEach(col => {
@@ -179,7 +180,8 @@ const ImportPage = {
       { value: 'description', label: 'Description / Memo' },
       { value: 'docNumber', label: 'Doc Number / Check #' },
       { value: 'class', label: 'Class (Tracking)' },
-      { value: 'taxCode', label: 'Tax Code' }
+      { value: 'taxCode', label: 'Tax Code' },
+      { value: 'taxAmount', label: 'Tax Amount' }
     ];
     if (this.transactionType === 'Bill') {
       fieldOptions.push({ value: 'dueDate', label: 'Due Date' });
@@ -260,7 +262,15 @@ const ImportPage = {
     <div class="form-group" style="grid-column:span 2">
       <label><input type="checkbox" id="defUseClass" checked> Use Class Tracking (uncheck if class not enabled in QBO)</label>
     </div>
-    <div class="form-group"><label>Default Tax Code (if not mapped)</label><input type="text" id="defTaxCode" placeholder="e.g. TAX or NON"></div>`;
+    <div class="form-group"><label>Default Tax Code (if not mapped)</label><input type="text" id="defTaxCode" placeholder="e.g. TAX or NON"></div>
+    <div class="form-group"><label>Default Tax Amount (if not mapped)</label><input type="number" step="0.01" id="defTaxAmount" placeholder="e.g. 10.00"></div>
+    <div class="form-group"><label>Tax Inclusive/Exclusive</label>
+      <select id="defTaxInclusive">
+        <option value="false">Exclusive (tax added on top)</option>
+        <option value="true">Inclusive (amount includes tax)</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Default Tax Rate Name (optional)</label><input type="text" id="defTaxRateName" placeholder="e.g. GST 10%"></div>`;
 
     html += `</div><div style="display:flex;gap:8px;margin-top:16px;">
       <button class="btn btn-outline" onclick="ImportPage.goStep2()">Back</button>
@@ -296,7 +306,10 @@ const ImportPage = {
       dueDate: document.getElementById('defDueDate')?.value || '',
       className: document.getElementById('defClass')?.value || '',
       useClass: document.getElementById('defUseClass')?.checked ? 'true' : 'false',
-      taxCode: document.getElementById('defTaxCode')?.value || ''
+      taxCode: document.getElementById('defTaxCode')?.value || '',
+      taxAmount: document.getElementById('defTaxAmount')?.value || '',
+      taxInclusive: document.getElementById('defTaxInclusive')?.value || 'false',
+      taxRateName: document.getElementById('defTaxRateName')?.value || ''
     };
     const dateFormat = document.getElementById('defDateFormat')?.value || '';
 

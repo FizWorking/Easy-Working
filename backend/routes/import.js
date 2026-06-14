@@ -90,11 +90,12 @@ router.post('/execute', auth, async (req, res) => {
     store.update('qbo_connections', { id: connId }, { access_token: at, refresh_token: rt });
   });
 
-  let accounts = [], vendors = [], classes = [], taxCodes = [];
+  let accounts = [], vendors = [], classes = [], taxCodes = [], taxRates = [];
   try { accounts = await qboSvc.getAccounts(); } catch (_) {}
   try { vendors = await qboSvc.getVendors(); } catch (_) {}
   try { classes = await qboSvc.getClasses(); } catch (_) {}
   try { taxCodes = await qboSvc.getTaxCodes(); } catch (_) {}
+  try { taxRates = await qboSvc.getTaxRates(); } catch (_) {}
 
   const acctMap = {};
   accounts.forEach(a => { acctMap[a.Name.toLowerCase()] = a.Id; acctMap[a.Id] = a.Id; });
@@ -104,6 +105,8 @@ router.post('/execute', auth, async (req, res) => {
   classes.forEach(c => { classMap[c.Name.toLowerCase()] = c.Id; classMap[c.Id] = c.Id; });
   const taxCodeMap = {};
   taxCodes.forEach(t => { taxCodeMap[t.Name.toLowerCase()] = t.Id; taxCodeMap[t.Id] = t.Id; });
+  const taxRateMap = {};
+  taxRates.forEach(r => { taxRateMap[r.Name.toLowerCase()] = r.Id; taxRateMap[r.Id] = r.Id; taxRateMap[r.RateValue?.toString()] = r.Id; });
 
   let success = 0, errors = 0;
 
@@ -112,7 +115,7 @@ router.post('/execute', auth, async (req, res) => {
     const rowNum = i + 2;
 
     try {
-      const qboData = buildQBOData(row, mapping, defaults, transactionType, acctMap, vendMap, classMap, taxCodeMap, dateFormat);
+      const qboData = buildQBOData(row, mapping, defaults, transactionType, acctMap, vendMap, classMap, taxCodeMap, taxRateMap, dateFormat, taxRates);
       if (i < 2) console.log('Row ' + rowNum + ' JSON:', JSON.stringify(qboData, null, 2));
       let result;
       if (transactionType === 'Expense') result = await qboSvc.createPurchase(qboData);
@@ -140,7 +143,7 @@ router.post('/execute', auth, async (req, res) => {
   res.json({ importId, status, total: cached.data.length, success, errors });
 });
 
-function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, taxCodeMap, dateFormat) {
+function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, taxCodeMap, taxRateMap, dateFormat, taxRates) {
   const val = (field) => {
     const col = mapping[field];
     return (col && row[col] !== undefined && row[col] !== '') ? row[col].toString().trim() : null;
@@ -214,11 +217,46 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
 
   // Tax Code on line item (from mapped column or default)
   const tcn = val('taxCode') || defaults.taxCode;
+  let taxCodeId = null;
   if (tcn && Object.keys(taxCodeMap).length > 0) {
-    const tcid = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
-    if (tcid && lineItem.DetailType === 'AccountBasedExpenseLineDetail') {
-      lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: tcid };
+    taxCodeId = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
+    if (taxCodeId && lineItem.DetailType === 'AccountBasedExpenseLineDetail') {
+      lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
     }
+  }
+
+  // Tax Amount & TxnTaxDetail
+  const taxAmtStr = val('taxAmount') || defaults.taxAmount;
+  const taxAmount = parseFloat(taxAmtStr);
+  if (!isNaN(taxAmount) && taxAmount > 0 && taxCodeId) {
+    const lineAmount = Math.abs(amount);
+    const isInclusive = defaults.taxInclusive === 'true';
+    const netAmount = isInclusive ? (lineAmount - taxAmount) : lineAmount;
+
+    lineItem.Amount = isInclusive ? netAmount : lineAmount;
+
+    const taxRateName = defaults.taxRateName || '';
+    let taxRateId = taxRateMap[taxRateName.toLowerCase()] || taxRateMap[taxRateName];
+    if (!taxRateId && taxRates.length > 0) {
+      const firstRate = taxRates.find(r => r.Id);
+      if (firstRate) taxRateId = firstRate.Id;
+    }
+
+    const taxLine = {
+      Amount: taxAmount,
+      DetailType: 'TaxLineDetail',
+      TaxLineDetail: {
+        NetAmount: netAmount,
+        PercentBased: false
+      }
+    };
+    if (taxRateId) taxLine.TaxLineDetail.TaxRateRef = { value: taxRateId };
+
+    data.TxnTaxDetail = {
+      TxnTaxCodeRef: { value: taxCodeId },
+      TotalTax: taxAmount,
+      TaxLine: [taxLine]
+    };
   }
 
   return data;
