@@ -20,8 +20,13 @@ const API = {
     }
 
     const res = await fetch(path, opts);
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Request failed');
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+    }
+    if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
     return json;
   },
 

@@ -146,7 +146,7 @@ const ImportPage = {
       'date': ['date', 'txn date', 'transaction date', 'trans date', 'posting date'],
       'vendor': ['vendor', 'vendor name', 'payee', 'supplier', 'name', 'supplier name'],
       'amount': ['amount', 'total', 'sum', 'value', 'transaction amount', 'amt'],
-      'account': ['account', 'expense account', 'category', 'account name', 'expense category', 'class', 'type'],
+      'account': ['account', 'expense account', 'category', 'account name', 'expense category', 'type'],
       'description': ['description', 'memo', 'note', 'notes', 'details', 'narration', 'particulars'],
       'docNumber': ['check', 'check no', 'check number', 'reference', 'ref no', 'doc number', 'reference number'],
       'dueDate': ['due date', 'due', 'pay by'],
@@ -198,12 +198,12 @@ const ImportPage = {
 
     html += `<div class="card"><div class="card-title">Map Columns to QuickBooks Fields</div>
     <div class="card-subtitle">Tell us which column in your file corresponds to each QuickBooks field.</div>`;
-    cols.forEach(col => {
+    cols.forEach((col, idx) => {
       const matched = Object.values(this.mapping).includes(col);
       html += `<div class="mapping-row">
         <div class="mapping-col-name">${esc(col)}</div>
         <div class="mapping-select">
-          <select id="map_${esc(col)}" onchange="ImportPage.updateMapping('${esc(col)}', this.value)">
+          <select id="map_${idx}" onchange="ImportPage.updateMapping(${idx}, this.value)">
             ${fieldOptions.map(f =>
               `<option value="${esc(f.value)}" ${(!f.value && !matched) ? 'selected' : (this.mapping[f.value] === col) ? 'selected' : ''}>${esc(f.label)}</option>`
             ).join('')}
@@ -283,7 +283,8 @@ const ImportPage = {
     c.innerHTML = html;
   },
 
-  updateMapping(col, value) {
+  updateMapping(colIdx, value) {
+    const col = this.fileData.columns[colIdx];
     for (const [k, v] of Object.entries(this.mapping)) {
       if (v === col) delete this.mapping[k];
     }

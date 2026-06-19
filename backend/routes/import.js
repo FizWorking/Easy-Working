@@ -32,7 +32,9 @@ const parseCache = new Map();
 setInterval(() => {
   const now = Date.now();
   for (const [key, val] of parseCache) {
-    if (now - val.ts > 3600000) parseCache.delete(key);
+    if (now - val.ts > 3600000) {
+      parseCache.delete(key);
+    }
   }
 }, 600000);
 
@@ -91,12 +93,11 @@ router.post('/execute', auth, async (req, res) => {
   });
 
   let accounts = [], vendors = [], classes = [], taxCodes = [], taxRates = [];
-  try { accounts = await qboSvc.getAccounts(); } catch (_) {}
-  try { vendors = await qboSvc.getVendors(); } catch (_) {}
-  try { classes = await qboSvc.getClasses(); } catch (e) { console.log('[CLASS DEBUG] getClasses error:', e.message); }
-  console.log('[CLASS DEBUG] Raw classes response:', JSON.stringify(classes));
-  try { taxCodes = await qboSvc.getTaxCodes(); } catch (_) {}
-  try { taxRates = await qboSvc.getTaxRates(); } catch (_) {}
+  try { accounts = await qboSvc.getAccounts(); } catch (e) { console.error('[IMPORT] Failed to fetch accounts:', e.message); }
+  try { vendors = await qboSvc.getVendors(); } catch (e) { console.error('[IMPORT] Failed to fetch vendors:', e.message); }
+  try { classes = await qboSvc.getClasses(); } catch (e) { console.error('[IMPORT] Failed to fetch classes:', e.message); }
+  try { taxCodes = await qboSvc.getTaxCodes(); } catch (e) { console.error('[IMPORT] Failed to fetch tax codes:', e.message); }
+  try { taxRates = await qboSvc.getTaxRates(); } catch (e) { console.error('[IMPORT] Failed to fetch tax rates:', e.message); }
 
   const acctMap = {};
   accounts.forEach(a => { acctMap[a.Name.toLowerCase().trim()] = a.Id; acctMap[a.Id] = a.Id; });
@@ -106,10 +107,8 @@ router.post('/execute', auth, async (req, res) => {
   classes.forEach(c => { classMap[c.Name.toLowerCase().trim()] = c.Id; classMap[c.Id] = c.Id; });
   const taxCodeMap = {};
   taxCodes.forEach(t => { taxCodeMap[t.Name.toLowerCase().trim()] = t.Id; taxCodeMap[t.Id] = t.Id; });
-  console.log(`[TAX DEBUG] TaxCodes found: ${taxCodes.length}`, taxCodes.map(t => ({ Id: t.Id, Name: t.Name })));
   const taxRateMap = {};
   taxRates.forEach(r => { taxRateMap[r.Name.toLowerCase().trim()] = r.Id; taxRateMap[r.Id] = r.Id; taxRateMap[r.RateValue?.toString()] = r.Id; });
-  console.log(`[TAX DEBUG] TaxRates found: ${taxRates.length}`, taxRates.map(r => ({ Id: r.Id, Name: r.Name, RateValue: r.RateValue })));
 
   let success = 0, errors = 0;
 
@@ -119,7 +118,6 @@ router.post('/execute', auth, async (req, res) => {
 
     try {
       const qboData = buildQBOData(row, mapping, defaults, transactionType, acctMap, vendMap, classMap, taxCodeMap, taxRateMap, dateFormat, taxRates);
-      if (i < 2 || qboData.TxnTaxDetail) console.log('Row ' + rowNum + ' JSON:', JSON.stringify(qboData, null, 2));
       let result;
       if (transactionType === 'Expense') result = await qboSvc.createPurchase(qboData);
       else if (transactionType === 'Bill') result = await qboSvc.createBill(qboData);
@@ -146,14 +144,30 @@ router.post('/execute', auth, async (req, res) => {
   res.json({ importId, status, total: cached.data.length, success, errors });
 });
 
+// Cleanup uploaded files older than 1 hour
+setInterval(() => {
+  const oneHourAgo = Date.now() - 3600000;
+  if (fs.existsSync(uploadDir)) {
+    fs.readdir(uploadDir, (err, files) => {
+      if (err) return;
+      files.forEach(f => {
+        const fp = path.join(uploadDir, f);
+        fs.stat(fp, (err, stat) => {
+          if (!err && stat.mtimeMs < oneHourAgo) fs.unlink(fp, () => {});
+        });
+      });
+    });
+  }
+}, 3600000);
+
 function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, taxCodeMap, taxRateMap, dateFormat, taxRates) {
   const val = (field) => {
     const col = mapping[field];
     return (col && row[col] !== undefined && row[col] !== '') ? row[col].toString().trim() : null;
   };
 
-  const amount = parseFloat(val('amount'));
-  if (isNaN(amount) || amount <= 0) throw new Error(`Invalid amount: ${val('amount')}`);
+  const amount = parseFloat(val('amount')?.replace(/[^0-9.\-]/g, '') || '');
+  if (isNaN(amount) || amount <= 0) throw new Error(`Invalid amount: ${val('amount') || '(empty)'}`);
 
   const desc = val('description') || val('memo') || '';
 
@@ -209,21 +223,15 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   // Class (only if useClass is enabled and classes exist in QBO)
   if (defaults.useClass !== 'false' && Object.keys(classMap).length > 0) {
     const cn = val('class');
-    const availableClasses = Object.keys(classMap).filter(k => isNaN(k));
-    console.log(`[CLASS DEBUG] Class val="${cn}", defaults.className="${defaults.className}", available classes=${availableClasses.join(', ')}`);
     if (cn) {
       const cid = classMap[cn.toLowerCase()] || classMap[cn];
       if (cid) {
         data.ClassRef = { value: cid };
-      } else {
-        console.log(`[CLASS WARNING] Class "${cn}" not found in QBO. Available: ${availableClasses.join(', ')}`);
       }
     } else if (defaults.className) {
       const cid = classMap[defaults.className.toLowerCase()] || classMap[defaults.className];
       if (cid) {
         data.ClassRef = { value: cid };
-      } else {
-        console.log(`[CLASS WARNING] Default class "${defaults.className}" not found in QBO.`);
       }
     }
   }
@@ -241,14 +249,12 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
         .find(k => cleanTcn.includes(k.toLowerCase().trim()));
       if (partial) {
         taxCodeId = taxCodeMap[partial];
-        console.log(`[TAX DEBUG] Partial match: "${tcn}" → "${partial}" (ID: ${taxCodeId})`);
       }
     }
     if (taxCodeId) {
       lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
     }
   }
-  if (tcn && !taxCodeId) console.log(`[TAX DEBUG] TaxCode "${tcn}" not found in taxCodeMap keys:`, Object.keys(taxCodeMap));
 
   // TxnTaxDetail with TotalTax (no TaxLine - QBO Canadian edition conflicts with TaxRateRef)
   const taxAmtStr = val('taxAmount') || defaults.taxAmount;
@@ -258,7 +264,6 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
       TxnTaxCodeRef: { value: taxCodeId },
       TotalTax: taxAmount
     };
-    console.log(`[TAX DEBUG] Adding TxnTaxDetail: TotalTax=${taxAmount}, TxnTaxCodeRef=${taxCodeId}`);
   }
 
   return data;
@@ -276,10 +281,15 @@ function fmtDate(s, format) {
   }
 
   // Excel serial date number (e.g. 45292 → 2024-01-01)
-  if (/^\d{5}$/.test(str)) {
-    const excelEpoch = new Date(1899, 11, 30);
-    const d = new Date(excelEpoch.getTime() + parseInt(str) * 86400000);
-    return d.toISOString().split('T')[0];
+  if (/^\d+$/.test(str)) {
+    const serialNum = parseInt(str, 10);
+    if (serialNum >= 1 && serialNum <= 2958465) {
+      const d = new Date(Date.UTC(1899, 11, 30) + (serialNum + 1) * 86400000);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
   }
 
   // Non-standard date like "+046301-01-01" (Excel serial misinterpreted)

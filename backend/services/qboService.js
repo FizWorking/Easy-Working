@@ -75,53 +75,56 @@ class QboService {
   }
 
   normalizeError(err) {
-    console.log('[QBO ERROR]', JSON.stringify({
-      status: err.response?.status,
-      statusText: err.response?.statusText,
-      data: err.response?.data,
-      headers: err.response?.headers
-    }, null, 2));
+    const status = err.response?.status;
+    const detail = err.response?.data?.Fault?.Error?.[0]?.Detail || '';
+    const message = err.response?.data?.Fault?.Error?.[0]?.Message || err.message;
+    console.error(`[QBO ERROR] ${status}: ${message}${detail ? ' [' + detail + ']' : ''}`);
     if (err.response?.data?.Fault?.Error) {
       const msgs = err.response.data.Fault.Error.map(e => {
-        const detail = e.Detail ? ' [' + e.Detail + ']' : '';
-        return (e.Message || '') + detail;
+        const d = e.Detail ? ' [' + e.Detail + ']' : '';
+        return (e.Message || '') + d;
       }).join('; ');
       return new Error(msgs || 'QBO API error');
     }
     return new Error(err.message || 'QBO API error');
   }
 
+  async queryAll(entityType, whereClause = '') {
+    let allResults = [];
+    let startPosition = 1;
+    const maxResults = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const query = `select%20*%20from%20${entityType}${whereClause}%20STARTPOSITION%20${startPosition}%20MAXRESULTS%20${maxResults}`;
+      const data = await this.get(`${this.baseUrl}/query?query=${query}&minorversion=73`);
+      const items = data.QueryResponse?.[entityType] || [];
+      allResults = allResults.concat(items);
+      startPosition += maxResults;
+      hasMore = items.length === maxResults;
+    }
+
+    return allResults;
+  }
+
   async getAccounts() {
-    const data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20Account%20where%20Active%20%3D%20true&minorversion=73`);
-    return data.QueryResponse?.Account || [];
+    return this.queryAll('Account', '%20where%20Active%20%3D%20true');
   }
 
   async getVendors() {
-    const data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20Vendor%20where%20Active%20%3D%20true&minorversion=73`);
-    return data.QueryResponse?.Vendor || [];
+    return this.queryAll('Vendor', '%20where%20Active%20%3D%20true');
   }
 
   async getClasses() {
-    let data;
-    try {
-      data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20Class&minorversion=73`);
-    } catch (e) {
-      console.log('[QBO CLASS ERROR]', e.message);
-      return [];
-    }
-    const result = data.QueryResponse?.Class || [];
-    console.log('[QBO CLASS DEBUG] getClasses raw:', JSON.stringify(result.map(c => ({ Id: c.Id, Name: c.Name, Active: c.Active }))));
-    return result;
+    return this.queryAll('Class');
   }
 
   async getTaxCodes() {
-    const data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20TaxCode&minorversion=73`);
-    return data.QueryResponse?.TaxCode || [];
+    return this.queryAll('TaxCode');
   }
 
   async getTaxRates() {
-    const data = await this.get(`${this.baseUrl}/query?query=select%20*%20from%20TaxRate&minorversion=73`);
-    return data.QueryResponse?.TaxRate || [];
+    return this.queryAll('TaxRate');
   }
 
   async createPurchase(data) {

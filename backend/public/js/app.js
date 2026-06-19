@@ -32,9 +32,11 @@ const App = {
 
   showSidebar(show) {
     const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
     if (show) {
       sidebar.classList.remove('hidden');
-      document.getElementById('userInfo').querySelector('.user-name').textContent = this.user?.name || '';
+      const userName = document.querySelector('#userInfo .user-name');
+      if (userName) userName.textContent = this.user?.name || '';
     } else {
       sidebar.classList.add('hidden');
     }

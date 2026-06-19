@@ -6,8 +6,11 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true
+}));
+app.use(express.json({ limit: '10mb' }));
 
 // Serve frontend
 app.use(express.static(path.join(__dirname, 'public')));
@@ -27,8 +30,9 @@ app.get('*', (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal server error' });
+  const msg = process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message;
+  console.error('Server error:', err.message);
+  res.status(err.status || 500).json({ error: msg });
 });
 
 app.listen(PORT, () => {
