@@ -240,10 +240,10 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   const tcn = val('taxCode') || defaults.taxCode;
   let taxCodeId = null;
   let taxRateId = null;
+  const cleanTcn = tcn?.toLowerCase().replace(/\(.*?\)/g, '').replace(/[%]/g, '').trim() || '';
   if (tcn && Object.keys(taxCodeMap).length > 0) {
     taxCodeId = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
     if (!taxCodeId) {
-      const cleanTcn = tcn.toLowerCase().replace(/\(.*?\)/g, '').replace(/[%]/g, '').trim();
       const partial = Object.keys(taxCodeMap)
         .filter(k => isNaN(k))
         .sort((a, b) => b.length - a.length)
@@ -259,7 +259,7 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
       const matchingRate = Object.keys(taxRateMap)
         .filter(k => isNaN(k))
         .sort((a, b) => b.length - a.length)
-        .find(k => k.toLowerCase().trim().includes(cleanTcn || tcn.toLowerCase()));
+        .find(k => k.toLowerCase().trim().includes(cleanTcn));
       if (matchingRate) {
         taxRateId = taxRateMap[matchingRate];
       }
