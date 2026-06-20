@@ -236,10 +236,9 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
     }
   }
 
-  // Tax Code lookup
+  // Tax Code lookup — set TaxCodeRef on line item so QBO auto-calculates tax
   const tcn = val('taxCode') || defaults.taxCode;
   let taxCodeId = null;
-  let taxRateId = null;
   const cleanTcn = tcn?.toLowerCase().replace(/\(.*?\)/g, '').replace(/[%]/g, '').trim() || '';
   if (tcn && Object.keys(taxCodeMap).length > 0) {
     taxCodeId = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
@@ -254,36 +253,10 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
     }
     if (taxCodeId) {
       lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
-
-      // Find matching tax rate for TaxLine
-      const rateMatch = Object.keys(taxRateMap)
-        .filter(k => isNaN(k))
-        .find(k => k.toLowerCase().trim().includes(cleanTcn));
-      if (rateMatch) {
-        taxRateId = taxRateMap[rateMatch];
-      }
     }
   }
 
-  // TxnTaxDetail with minimal TaxLine (needed for proper UI display in QBO)
-  const taxAmtStr = val('taxAmount') || defaults.taxAmount;
-  const taxAmount = parseFloat(taxAmtStr?.replace(/[^0-9.\-]/g, '') || '');
-  if (!isNaN(taxAmount) && taxAmount > 0) {
-    data.TxnTaxDetail = { TotalTax: taxAmount };
-    const refId = taxCodeId || lineItem.AccountBasedExpenseLineDetail.TaxCodeRef?.value;
-    if (refId) {
-      data.TxnTaxDetail.TxnTaxCodeRef = { value: refId };
-    }
-    if (taxRateId) {
-      data.TxnTaxDetail.TaxLine = [{
-        Amount: taxAmount,
-        DetailType: 'TaxLineDetail',
-        TaxLineDetail: {
-          TaxRateRef: { value: taxRateId }
-        }
-      }];
-    }
-  }
+  // No TxnTaxDetail — QBO auto-calculates tax from line TaxCodeRef + line amount
 
   return data;
 }
