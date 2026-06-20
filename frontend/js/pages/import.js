@@ -151,8 +151,8 @@ const ImportPage = {
       'docNumber': ['check', 'check no', 'check number', 'reference', 'ref no', 'doc number', 'reference number'],
       'dueDate': ['due date', 'due', 'pay by'],
       'class': ['class', 'class name', 'tracking class'],
-      'taxAmount': ['linetaxamount', 'taxamount', 'tax amount', 'tax amt', 'gst amount', 'vat amount', 'hst amount', 'sales tax amount'],
-      'taxCode': ['linetaxcode', 'taxcode', 'tax code', 'tax category', 'gst', 'hst', 'vat', 'sales tax', 'tax rate']
+      'taxAmount': ['linetaxamount', 'taxamount', 'tax amount', 'tax amt', 'gst amount', 'vat amount', 'hst amount', 'sales tax amount', 'igst amount', 'cgst amount', 'sgst amount', 'cess amount', 'total tax', 'output tax', 'input tax', 'tax value', 'gst value', 'hst value', 'tax total', 'tcs amount', 'tds amount'],
+      'taxCode': ['linetaxcode', 'taxcode', 'tax code', 'tax category', 'gst', 'hst', 'vat', 'sales tax', 'tax rate', 'igst', 'cgst', 'sgst', 'cess', 'tax %', 'gst %', 'hst %', 'igst %', 'cgst %', 'sgst %', 'tax percentage', 'output gst', 'input gst', 'tcs', 'tds', 'tax name']
     };
 
     cols.forEach(col => {

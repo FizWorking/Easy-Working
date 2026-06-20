@@ -239,6 +239,7 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
   // Tax Code lookup
   const tcn = val('taxCode') || defaults.taxCode;
   let taxCodeId = null;
+  let taxRateId = null;
   if (tcn && Object.keys(taxCodeMap).length > 0) {
     taxCodeId = taxCodeMap[tcn.toLowerCase()] || taxCodeMap[tcn];
     if (!taxCodeId) {
@@ -246,24 +247,52 @@ function buildQBOData(row, mapping, defaults, type, acctMap, vendMap, classMap, 
       const partial = Object.keys(taxCodeMap)
         .filter(k => isNaN(k))
         .sort((a, b) => b.length - a.length)
-        .find(k => cleanTcn.includes(k.toLowerCase().trim()));
+        .find(k => k.toLowerCase().trim().includes(cleanTcn));
       if (partial) {
         taxCodeId = taxCodeMap[partial];
       }
     }
     if (taxCodeId) {
       lineItem.AccountBasedExpenseLineDetail.TaxCodeRef = { value: taxCodeId };
+
+      // Try to find matching tax rate for TaxLine
+      const matchingRate = Object.keys(taxRateMap)
+        .filter(k => isNaN(k))
+        .sort((a, b) => b.length - a.length)
+        .find(k => k.toLowerCase().trim().includes(cleanTcn || tcn.toLowerCase()));
+      if (matchingRate) {
+        taxRateId = taxRateMap[matchingRate];
+      }
     }
   }
 
-  // TxnTaxDetail with TotalTax (no TaxLine - QBO Canadian edition conflicts with TaxRateRef)
+  // TxnTaxDetail with TaxLine
   const taxAmtStr = val('taxAmount') || defaults.taxAmount;
-  const taxAmount = parseFloat(taxAmtStr);
-  if (!isNaN(taxAmount) && taxAmount > 0 && taxCodeId) {
+  const taxAmount = parseFloat(taxAmtStr?.replace(/[^0-9.\-]/g, '') || '');
+  if (!isNaN(taxAmount) && taxAmount > 0) {
     data.TxnTaxDetail = {
-      TxnTaxCodeRef: { value: taxCodeId },
       TotalTax: taxAmount
     };
+    if (taxCodeId) {
+      data.TxnTaxDetail.TxnTaxCodeRef = { value: taxCodeId };
+    }
+    // Build TaxLine for proper QBO tax handling
+    if (taxRateId) {
+      const taxPct = taxRates.find(r => r.Id == taxRateId)?.RateValue;
+      const pctNum = parseFloat(taxPct);
+      data.TxnTaxDetail.TaxLine = [{
+        Amount: taxAmount,
+        DetailType: 'TaxLineDetail',
+        TaxLineDetail: {
+          TaxRateRef: { value: taxRateId },
+          PercentBased: true,
+          TaxPercent: pctNum || 0,
+          NetAmountRange: {
+            Amount: taxCodeId ? Math.abs(amount) : 0
+          }
+        }
+      }];
+    }
   }
 
   return data;
